@@ -1,80 +1,79 @@
-@startuml KUDefensePackageDiagram
+@startuml KUDefenseTower_PackageDiagram
 
-' Layer 1 - UI
+skinparam packageStyle rectangle
+title KUDefenseTower - Logical Architecture (Package Diagram)
+
+'---------------- UI Layer ----------------
 package "UI" {
-  package "view.screens" {
-    class GameScreen
-    class MapEditorScreen
-    class OptionScreen
-    class MainMenuScreen
-  }
-
-  package "view.components" {
-    class TowerPanel
-    class MapGrid
-    class GameControlPanel
-  }
-
-  package "view.animations" {
-    class ProjectileAnimation
-    class ExplosionAnimation
-  }
+  [MainMenuScreen]
+  [OptionsScreen]
+  [MapEditorScreen]
+  [GameScreen]
+  [TowerPopup]
 }
 
-' Layer 2 - Domain
+'---------------- Domain Layer ----------------
 package "Domain" {
   package "model.map" {
-    class Map
-    class Tile
-    class Path
-    class TowerSlot
+    [Map]
+    [Tile]
+    [Path]
+    [TowerSlot]
   }
 
   package "model.entities" {
-    class Enemy
-    class Goblin
-    class Knight
-    class Wave
-    class Group
-    class Projectile
-    class Tower
-    class ArcherTower
-    class ArtilleryTower
-    class MageTower
-    class TowerType
+    [Enemy]
+    [Goblin]
+    [Knight]
+  }
+
+  package "model.projectiles" {
+    [Arrow]
+    [Spell]
+    [ArtilleryShell]
+  }
+
+  package "model.towers" {
+    [Tower]
+    [ArcherTower]
+    [MageTower]
+    [ArtilleryTower]
   }
 
   package "model.game" {
-    class GameSession
-    class Player
-    class GameOptions
+    [Player]
+    [GameSession]
+    [GameOptions]
   }
 
   package "controller" {
-    class GameController
-    class MapEditorController
-    class OptionsController
+    [GameController]
+    [MapEditorController]
+    [OptionsController]
   }
 }
 
-' Layer 3 - Technical Services
+'---------------- Technical Services Layer ----------------
 package "Technical Services" {
   package "persistence" {
-    class MapSerializer
-    class OptionsSerializer
-    class FileManager
+    [MapSerializer]
+    [OptionsSerializer]
+    [FileManager]
   }
 
   package "util" {
-    class PathFinder
-    class MathUtils
-    class GameClock
-    class ResourceLoader
+    [PathFinder]
+    [GameClock]
+    [MathUtils]
+    [ResourceLoader]
   }
 }
 
-' Dependencies
+'---------------- Dependencies ----------------
 "UI" ..> "Domain" : observes
 "Domain" ..> "Technical Services" : uses
+"controller" ..> "UI" : updates
+"controller" ..> "model" : manipulates
+"controller" ..> "persistence" : loads/saves
 
 @enduml
