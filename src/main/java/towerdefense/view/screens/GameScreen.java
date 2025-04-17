@@ -3,15 +3,20 @@ package towerdefense.view.screens;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
+import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
+import javafx.scene.text.Text;
 import towerdefense.Main; // For navigation
 import towerdefense.controller.GameController; // Import controller
 import towerdefense.model.GameModel; // If game state is needed
+import towerdefense.model.GameMap; // Import GameMap
+import towerdefense.model.TileType; // Import TileType
 
 /**
  * Provides the JavaFX UI components for the Game screen.
@@ -32,6 +37,7 @@ public class GameScreen {
                                                                                                                       // for
                                                                                                                       // dark
                                                                                                                       // background
+    private final double TILE_SIZE = 32.0; // Define a fixed tile size
 
     public GameScreen(GameController controller) {
         this.controller = controller;
@@ -47,18 +53,8 @@ public class GameScreen {
 
         // --- Game Board Area (Center) ---
         gameBoardPane = new Pane();
-        // Simple grass/dirt placeholder color
-        gameBoardPane.setStyle("-fx-background-color: #779977; -fx-border-color: black;");
-        gameBoardPane.setPrefSize(800, 600);
-        Label gamePlaceholder = new Label("Game Board Area (JavaFX)");
-        gamePlaceholder.setFont(Font.font(24));
-        gamePlaceholder.setStyle("-fx-text-fill: white;");
-        gameBoardPane.getChildren().add(gamePlaceholder);
-        // Center the placeholder label (simple centering)
-        gamePlaceholder.layoutXProperty()
-                .bind(gameBoardPane.widthProperty().subtract(gamePlaceholder.widthProperty()).divide(2));
-        gamePlaceholder.layoutYProperty()
-                .bind(gameBoardPane.heightProperty().subtract(gamePlaceholder.heightProperty()).divide(2));
+        gameBoardPane.setStyle("-fx-background-color: #5a4a3a;"); // Set background for area around map
+        // Size will be determined by the map loaded
 
         view.setCenter(gameBoardPane);
         BorderPane.setMargin(gameBoardPane, new Insets(0, 10, 10, 0)); // Margin adjusted
@@ -160,17 +156,97 @@ public class GameScreen {
     }
 
     /**
-     * Placeholder method for redrawing the game board (enemies, towers, etc.).
+     * Draws the static background map tiles based on the GameMap data.
+     * Called by the controller when the view is set or the map changes.
+     */
+    public void drawMap(GameMap map) {
+        if (map == null)
+            return;
+        Platform.runLater(() -> {
+            gameBoardPane.getChildren().clear(); // Clear previous drawings
+            int numRows = map.getHeight();
+            int numCols = map.getWidth();
+
+            // Adjust pane size based on map dimensions
+            gameBoardPane.setPrefSize(numCols * TILE_SIZE, numRows * TILE_SIZE);
+            gameBoardPane.setMaxSize(numCols * TILE_SIZE, numRows * TILE_SIZE);
+
+            for (int r = 0; r < numRows; r++) {
+                for (int c = 0; c < numCols; c++) {
+                    TileType type = map.getTile(r, c);
+                    Node tileNode = createTileNode(type, r, c); // Create node for the tile
+                    tileNode.setLayoutX(c * TILE_SIZE);
+                    tileNode.setLayoutY(r * TILE_SIZE);
+                    gameBoardPane.getChildren().add(tileNode);
+                }
+            }
+            // TODO: Draw grid lines if needed for debugging
+        });
+    }
+
+    /**
+     * Creates a visual Node (e.g., colored Rectangle or ImageView) for a given tile
+     * type.
+     */
+    private Node createTileNode(TileType type, int row, int col) {
+        // For now, use colored rectangles. Later, replace with ImageViews.
+        Rectangle rect = new Rectangle(TILE_SIZE, TILE_SIZE);
+        Text marker = null;
+        Color color = Color.PINK; // Default/Error color
+
+        switch (type) {
+            case GRASS:
+                color = Color.web("#90ee90");
+                break; // Light Green
+            case PATH:
+                color = Color.web("#f5deb3");
+                break; // Wheat
+            case TOWER_SLOT:
+                color = Color.web("#a9a9a9");
+                break; // Dark Gray
+            case START:
+                color = Color.web("#f5deb3");
+                marker = new Text("S");
+                break;
+            case END:
+                color = Color.web("#f5deb3");
+                marker = new Text("E");
+                break;
+            case DECOR_TREE:
+                color = Color.DARKGREEN;
+                break;
+            case DECOR_ROCK:
+                color = Color.GRAY;
+                break;
+        }
+        rect.setFill(color);
+        rect.setStroke(Color.web("#5a6870")); // Light border
+        rect.setStrokeWidth(0.5);
+
+        // If using markers (like S/E), stack them on the rectangle
+        if (marker != null) {
+            marker.setStyle("-fx-font-weight: bold;");
+            // Center the text within the tile
+            StackPane stack = new StackPane(rect, marker);
+            return stack;
+        } else {
+            return rect;
+        }
+        // TODO: Add click listener here if needed for interaction (e.g., build tower)
+    }
+
+    /**
+     * Placeholder method for redrawing dynamic elements (enemies, towers,
+     * projectiles).
      * This should be called by the controller/game loop.
      */
-    public void redrawGameBoard(/* Potentially pass necessary game state */) {
+    public void redrawGameBoard(/* Potentially pass dynamic game state */) {
         Platform.runLater(() -> {
-            // TODO: Clear gameBoardPane and redraw all elements based on model state
-            // - Draw map background/path
-            // - Draw enemies at their current positions
-            // - Draw towers
-            // - Draw projectiles
-            System.out.println("View: Redrawing game board (placeholder)");
+            // TODO: Clear only dynamic elements (or redraw everything)
+            // TODO: Draw enemies based on their current positions from model
+            // TODO: Draw towers (potentially with animations/state)
+            // TODO: Draw projectiles
+            // System.out.println("View: Redrawing dynamic elements (placeholder)");
         });
     }
 

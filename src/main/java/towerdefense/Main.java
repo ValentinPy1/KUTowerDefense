@@ -86,6 +86,9 @@ public class Main extends Application {
             currentGameController = new GameController(gameModel, selectedMap);
             // Create Screen, passing the controller
             GameScreen gameProvider = new GameScreen(currentGameController);
+            // Give controller reference to the view
+            currentGameController.setView(gameProvider);
+            // Get the root node AFTER view might have been updated by controller.setView()
             Parent gameRoot = gameProvider.getView();
             setSceneRoot(gameRoot, "Tower Defense - Game");
             // Start the game loop AFTER the scene is set and shown

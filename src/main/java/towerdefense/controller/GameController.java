@@ -1,8 +1,15 @@
 package towerdefense.controller;
 
 import javafx.animation.AnimationTimer; // For game loop
+import towerdefense.model.GameMap;
 import towerdefense.model.GameModel;
+import towerdefense.view.screens.GameScreen; // Import the view
 // Import specific model elements if needed (Enemy, Tower, Projectile)
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
 
 /**
  * Controller for the main game logic.
@@ -11,32 +18,90 @@ import towerdefense.model.GameModel;
 public class GameController {
 
     private GameModel model;
-    private String currentMapName; // Or reference to loaded map object
+    private String mapPath;
     private GameLoopTimer gameLoop;
     private boolean isPaused = false;
     private double gameSpeed = 1.0; // Multiplier for game time
+    private GameScreen view; // Add reference to the view
 
     // Maybe hold reference to view to call update methods?
     // private towerdefense.view.screens.GameScreen gameView;
 
-    public GameController(GameModel model, String selectedMap) {
+    public GameController(GameModel model, String mapPath) {
         this.model = model;
-        this.currentMapName = selectedMap;
-        // TODO: Load the actual map data into the model based on selectedMap name
-        // model.loadMap(selectedMap);
-        System.out.println("GameController initialized for map: " + selectedMap);
-        this.gameLoop = new GameLoopTimer();
+        this.mapPath = mapPath;
+        GameMap loadedMap = loadMapFromFile(mapPath); // Load the map
+
+        if (loadedMap == null) {
+            System.err.println("ERROR: Failed to load map from: " + mapPath + ". Game cannot proceed.");
+            // Prevent game loop creation if map loading fails
+            this.gameLoop = null;
+            // Optionally set a flag or state indicating loading failure
+        } else {
+            System.out.println("GameController initialized with map: " + mapPath);
+            // Pass loaded map data to the GameModel
+            model.setCurrentMap(loadedMap);
+            this.gameLoop = new GameLoopTimer();
+        }
+    }
+
+    /** Sets the view associated with this controller */
+    public void setView(GameScreen view) {
+        this.view = view;
+        // Initial update after view is set (if map loaded)
+        if (model.getCurrentMap() != null && view != null) {
+            view.drawMap(model.getCurrentMap()); // Draw initial map
+            view.updateInfoLabels(model.getCurrentWave(), model.getTotalWaves(), model.getGold(), model.getLives());
+        }
     }
 
     /**
-     * Starts the game loop.
+     * Attempts to load a GameMap object from a file.
+     * 
+     * @param path Path to the .tdmap file.
+     * @return The loaded GameMap, or null if loading fails.
+     */
+    private GameMap loadMapFromFile(String path) {
+        File file = new File(path);
+        if (!file.exists()) {
+            System.err.println("Map file not found: " + path);
+            return null;
+        }
+        try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(file))) {
+            Object obj = ois.readObject();
+            if (obj instanceof GameMap) {
+                System.out.println("Map loaded successfully from: " + file.getAbsolutePath());
+                return (GameMap) obj;
+            } else {
+                System.err.println("Invalid file content, not a GameMap: " + path);
+                return null;
+            }
+        } catch (IOException | ClassNotFoundException | ClassCastException e) {
+            System.err.println("Error loading map from file " + path + ": " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    /**
+     * Starts the game loop if the map was loaded successfully.
      */
     public void startGame() {
-        System.out.println("GameController: Starting game...");
+        GameMap currentMap = model.getCurrentMap(); // Get map from model
+        if (gameLoop == null || currentMap == null) {
+            System.err.println("Cannot start game, map not loaded properly.");
+            // TODO: Navigate back or show error message?
+            return;
+        }
+        System.out.println("GameController: Starting game with map " + mapPath + "...");
         isPaused = false;
         gameSpeed = 1.0;
-        // TODO: Initialize game state in the model (wave 1, starting gold, lives etc.)
-        // model.initializeGame();
+        // Initialize game state IN THE MODEL using the loaded gameMap
+        model.initializeGame(currentMap);
+        // Update view labels with initial game state
+        if (view != null) {
+            view.updateInfoLabels(model.getCurrentWave(), model.getTotalWaves(), model.getGold(), model.getLives());
+        }
         gameLoop.start();
     }
 
@@ -44,8 +109,10 @@ public class GameController {
      * Stops the game loop.
      */
     public void stopGame() {
-        System.out.println("GameController: Stopping game...");
-        gameLoop.stop();
+        if (gameLoop != null) {
+            System.out.println("GameController: Stopping game...");
+            gameLoop.stop();
+        }
     }
 
     /**
@@ -126,12 +193,12 @@ public class GameController {
             updateGameModel(gameDeltaTime);
 
             // --- Update UI --- //
-            // This might involve calling methods on a view reference,
-            // or the view observing the model.
-            // if (gameView != null) {
-            // gameView.updateUI(); // Update labels like gold, lives, wave
-            // gameView.redrawGameBoard(); // Trigger redraw of enemies, towers, projectiles
-            // }
+            if (view != null) {
+                // Update labels (can be optimized to update only when changed)
+                view.updateInfoLabels(model.getCurrentWave(), model.getTotalWaves(), model.getGold(), model.getLives());
+                // Trigger redraw of dynamic elements (enemies, projectiles)
+                view.redrawGameBoard();
+            }
 
             // --- Check Game Over/Win Conditions --- //
             if (model.isGameOver()) {
@@ -154,21 +221,11 @@ public class GameController {
      * @param deltaTime Time elapsed since last update (adjusted for game speed).
      */
     private void updateGameModel(double deltaTime) {
-        // TODO: Implement all game logic updates here, calling methods on the model
-        // - Spawn enemies based on wave timing
-        // - Move enemies along path
-        // - Towers acquire targets and fire projectiles
-        // - Move projectiles
-        // - Handle projectile hits and enemy damage/death
-        // - Handle enemies reaching the exit
-        // - Update gold
-
-        // Example calls (replace with actual model methods):
-        // model.spawnEnemies(deltaTime);
-        // model.moveEnemies(deltaTime);
-        // model.updateTowers(deltaTime);
-        // model.moveProjectiles(deltaTime);
-        // model.handleCollisions();
-        // model.checkEndOfPath();
+        if (model.getCurrentMap() == null)
+            return; // Don't update if no map
+        // TODO: Implement game logic using model.getCurrentMap()
+        // model.spawnEnemies(deltaTime, model.getCurrentMap());
+        // model.moveEnemies(deltaTime, model.getCurrentMap());
+        // ... etc ...
     }
 }

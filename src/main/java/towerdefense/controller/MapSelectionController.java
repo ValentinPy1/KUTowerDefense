@@ -1,14 +1,16 @@
 package towerdefense.controller;
 
+import javafx.collections.FXCollections;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
 import javafx.scene.control.ListView;
 import towerdefense.Main; // Import Main for navigation
 import towerdefense.model.GameModel;
-// import towerdefense.view.screens.GameScreen; // No longer needed directly
-// import towerdefense.view.screens.MainMenuScreen; // No longer needed directly
-// import javax.swing.SwingUtilities; // No longer needed here
-// import javafx.stage.Stage; // No longer needed
+
+import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Controller for the Map Selection Screen.
@@ -16,8 +18,10 @@ import towerdefense.model.GameModel;
  */
 public class MapSelectionController {
 
+    private static final String MAPS_DIRECTORY = "maps"; // Directory relative to project root
+
     @FXML
-    private ListView<String> mapListView; // Placeholder for map names
+    private ListView<String> mapListView; // Display map file names
 
     @FXML
     private Button startGameButton;
@@ -25,41 +29,63 @@ public class MapSelectionController {
     @FXML
     private Button backButton;
 
-    private GameModel model; // Keep a reference if needed
-    // private Stage stage; // Remove stage reference
+    private GameModel model;
 
-    // Initialize no longer needs the stage
-    public void initialize(GameModel model, /* Stage stage */ Void unused) {
+    // Initialize loads map files
+    public void initialize(GameModel model, Void unused) { // Signature matches call in Main
         this.model = model;
-        // this.stage = stage;
-        // TODO: Populate mapListView with saved map files
-        mapListView.getItems().add("Placeholder Map 1");
-        mapListView.getItems().add("Placeholder Map 2");
+
+        loadMapFiles();
+
         // Disable start button until a map is selected
-        startGameButton.setDisable(true); // Start disabled
+        startGameButton.setDisable(true);
         mapListView.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
             startGameButton.setDisable(newVal == null);
         });
     }
 
+    /**
+     * Scans the maps directory and populates the ListView.
+     */
+    private void loadMapFiles() {
+        List<String> mapFiles = new ArrayList<>();
+        File mapsDir = new File(MAPS_DIRECTORY);
+
+        if (mapsDir.exists() && mapsDir.isDirectory()) {
+            File[] files = mapsDir.listFiles((dir, name) -> name.toLowerCase().endsWith(".tdmap"));
+            if (files != null) {
+                mapFiles = java.util.Arrays.stream(files)
+                        .map(File::getName)
+                        // Optionally remove the .tdmap extension for display
+                        // .map(name -> name.substring(0, name.length() - ".tdmap".length()))
+                        .collect(Collectors.toList());
+            }
+        }
+
+        if (mapFiles.isEmpty()) {
+            mapListView.setPlaceholder(new javafx.scene.control.Label("No maps found in 'maps' directory."));
+        }
+        mapListView.setItems(FXCollections.observableArrayList(mapFiles));
+    }
+
     @FXML
     private void handleStartGame() {
-        String selectedMap = mapListView.getSelectionModel().getSelectedItem();
-        if (selectedMap != null) {
-            System.out.println("Starting game with map: " + selectedMap);
-            // Load game screen using Main's method
-            Main.loadGameScreen(selectedMap);
+        String selectedMapFile = mapListView.getSelectionModel().getSelectedItem();
+        if (selectedMapFile != null) {
+            System.out.println("Starting game with map file: " + selectedMapFile);
+            // Construct the full path if needed, or just pass the name
+            String mapNameToLoad = MAPS_DIRECTORY + File.separator + selectedMapFile;
+            // Load game screen using Main's method, passing the map identifier
+            Main.loadGameScreen(mapNameToLoad); // Pass full path or just name
         } else {
-            // Optional: Show an alert if no map is selected
+            // Should not happen due to button disable logic, but good practice
             System.out.println("No map selected!");
-            // Consider using JavaFX Alert dialog here
         }
     }
 
     @FXML
     private void handleBackButton() {
         System.out.println("Going back to Main Menu");
-        // Load main menu screen using Main's method
         Main.loadMainMenuScreen();
     }
 }
