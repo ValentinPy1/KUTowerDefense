@@ -3,77 +3,53 @@
 skinparam packageStyle rectangle
 title KUDefenseTower - Logical Architecture (Package Diagram)
 
-'---------------- UI Layer ----------------
+' ---------------- UI Layer ----------------
 package "UI" {
-  [MainMenuScreen]
-  [OptionsScreen]
-  [MapEditorScreen]
-  [GameScreen]
-  [TowerPopup]
+  package "Swing" {
+    [MainMenuScreen]
+    [OptionsScreen]
+    [MapEditorScreen]
+    [GameScreen]
+  }
+
+  
 }
 
-'---------------- Domain Layer ----------------
+' ---------------- Domain Layer ----------------
 package "Domain" {
-  package "model.map" {
-    [Map]
-    [Tile]
-    [Path]
-    [TowerSlot]
-  }
-
-  package "model.entities" {
-    [Enemy]
+  package "Game Entities" {
     [Goblin]
     [Knight]
-  }
-
-  package "model.projectiles" {
+    [Wave]
+    [Group]
     [Arrow]
     [Spell]
     [ArtilleryShell]
-  }
-
-  package "model.towers" {
-    [Tower]
     [ArcherTower]
     [MageTower]
     [ArtilleryTower]
-  }
-
-  package "model.game" {
+    [TowerSlot]
     [Player]
-    [GameSession]
-    [GameOptions]
   }
 
-  package "controller" {
-    [GameController]
-    [MapEditorController]
-    [OptionsController]
-  }
+  [GamePlay Rules]
+  [Game Mechanics]
+  [State and Progress Management]
 }
 
-'---------------- Technical Services Layer ----------------
-package "Technical Services" {
-  package "persistence" {
-    [MapSerializer]
-    [OptionsSerializer]
-    [FileManager]
-  }
-
-  package "util" {
-    [PathFinder]
-    [GameClock]
-    [MathUtils]
-    [ResourceLoader]
-  }
+' ---------------- Technical Services Layer ----------------
+package "Technical Service" {
+  [MapSerializer]
+  [OptionsSerializer]
+  [FileManager]
+  [PathFinder]
+  [GameClock]
+  [MathUtils]
+  [ResourceLoader]
 }
 
-'---------------- Dependencies ----------------
-"UI" ..> "Domain" : observes
-"Domain" ..> "Technical Services" : uses
-"controller" ..> "UI" : updates
-"controller" ..> "model" : manipulates
-"controller" ..> "persistence" : loads/saves
+' ---------------- Dependencies ----------------
+"UI" ..> "Domain"
+"Domain" ..> "Technical Service"
 
 @enduml
