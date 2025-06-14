@@ -51,8 +51,7 @@ public class Tile implements Serializable {
         TILE_COORDS.put(TileType.PATH_HORIZONTAL, new Point2D(1, 3));
         TILE_COORDS.put(TileType.PATH_HORIZONTAL_E_DE, new Point2D(2, 3));
         TILE_COORDS.put(TileType.TOWER_SLOT, new Point2D(3, 3));
-        TILE_COORDS.put(TileType.START_POINT, new Point2D(4, 0)); // Placeholder for START_POINT sprite - ADJUST IF
-                                                                  // NEEDED
+        TILE_COORDS.put(TileType.START_POINT, new Point2D(2, 7)); // Use TOWER_BARACK coordinates for START_POINT
         TILE_COORDS.put(TileType.TREE_BIG, new Point2D(0, 4));
         TILE_COORDS.put(TileType.TREE_MEDIUM, new Point2D(1, 4));
         TILE_COORDS.put(TileType.TREE_SMALL, new Point2D(2, 4));
@@ -310,7 +309,8 @@ public class Tile implements Serializable {
                     HOUSE, WELL, LOG_PILE,
                     TOWER_ARTILLERY, TOWER_MAGE, ARCHER_TOWER, TOWER_BARACK,
                     TOWER_SLOT,
-                    CASTLE1, CASTLE2, CASTLE3, CASTLE4, END_POINT ->
+                    CASTLE1, CASTLE2, CASTLE3, CASTLE4, END_POINT,
+                    START_POINT -> // Add START_POINT as overlay prop
                 true;
             default -> false;
         };

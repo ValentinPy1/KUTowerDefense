@@ -43,6 +43,11 @@ public class Main extends Application {
         }
 
         primaryStage.setScene(scene);
+        
+        // Enforce custom cursor throughout the application
+        UIAssets.enforceCustomCursor(scene);
+        UIAssets.startCursorEnforcement(scene);
+        
         primaryStage.show();
     }
 
@@ -75,6 +80,36 @@ public class Main extends Application {
             backgroundMusicPlayer.dispose();
             backgroundMusicPlayer = null;
             System.out.println("Background music stopped.");
+        }
+    }
+    
+    /**
+     * Switch to a different background music track.
+     * 
+     * @param fileName the name of the music file (e.g., "Yeah.mp3")
+     */
+    public static void switchBackgroundMusic(String fileName) {
+        if (backgroundMusicPlayer != null) {
+            backgroundMusicPlayer.stop();
+            backgroundMusicPlayer.dispose();
+        }
+        
+        try {
+            URL musicFileUrl = Main.class.getResource("/Asset_pack/Musics/" + fileName);
+            if (musicFileUrl == null) {
+                System.err.println("Music file not found: /Asset_pack/Musics/" + fileName);
+                return;
+            }
+            
+            Media media = new Media(musicFileUrl.toExternalForm());
+            backgroundMusicPlayer = new MediaPlayer(media);
+            backgroundMusicPlayer.setOnEndOfMedia(() -> backgroundMusicPlayer.seek(Duration.ZERO));
+            backgroundMusicPlayer.setVolume(0.5);
+            backgroundMusicPlayer.play();
+            System.out.println("Background music switched to: " + fileName);
+        } catch (Exception e) {
+            System.err.println("Error switching background music to " + fileName + ": " + e.getMessage());
+            e.printStackTrace();
         }
     }
 

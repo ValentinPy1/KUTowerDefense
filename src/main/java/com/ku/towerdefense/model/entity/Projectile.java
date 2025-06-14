@@ -149,49 +149,104 @@ public class Projectile extends Entity implements Serializable {
             gc.rotate(rotation);
             gc.drawImage(image, -width / 2, -height / 2, width, height);
         } else {
-            // Draw a simple shape based on the damage type
+            // Draw enhanced shapes based on the damage type
             switch (damageType) {
                 case ARROW:
-                    // Draw an arrow shape
+                    // Enhanced arrow shape with fletching and tip
                     gc.translate(centerX, centerY);
                     gc.rotate(rotation);
-                    gc.setFill(color);
                     
-                    double[] xPoints = {-width / 2, width / 2, width / 4, width / 4, -width / 4, -width / 4};
-                    double[] yPoints = {0, 0, height / 4, height / 2, height / 2, height / 4};
-                    gc.fillPolygon(xPoints, yPoints, 6);
+                    // Arrow shaft
+                    gc.setFill(Color.SADDLEBROWN);
+                    gc.fillRect(-width / 2, -height / 6, width * 0.8, height / 3);
+                    
+                    // Arrow tip (metallic)
+                    gc.setFill(Color.SILVER);
+                    double[] tipX = {width * 0.3, width / 2, width * 0.3};
+                    double[] tipY = {-height / 4, 0, height / 4};
+                    gc.fillPolygon(tipX, tipY, 3);
+                    
+                    // Fletching (feathers)
+                    gc.setFill(color.darker());
+                    double[] fletchX = {-width / 2, -width * 0.3, -width / 2};
+                    double[] fletchY1 = {-height / 3, -height / 6, 0};
+                    double[] fletchY2 = {0, height / 6, height / 3};
+                    gc.fillPolygon(fletchX, fletchY1, 3);
+                    gc.fillPolygon(fletchX, fletchY2, 3);
                     
                     break;
                     
                 case MAGIC:
-                    // Draw a glowing orb
-                    gc.setGlobalAlpha(0.7);
+                    // Enhanced magical orb with particle effects
+                    double time = System.currentTimeMillis() * 0.005; // For animation
+                    
+                    // Outer magical aura (pulsing)
+                    double pulseSize = 1.0 + 0.3 * Math.sin(time);
+                    gc.setGlobalAlpha(0.3);
+                    gc.setFill(color.deriveColor(0, 1.0, 1.5, 1.0));
+                    gc.fillOval(x - width * 0.2 * pulseSize, y - height * 0.2 * pulseSize, 
+                               width * (1.4 * pulseSize), height * (1.4 * pulseSize));
+                    
+                    // Main orb body
+                    gc.setGlobalAlpha(0.8);
                     gc.setFill(color);
                     gc.fillOval(x, y, width, height);
                     
-                    // Draw a brighter core
+                    // Bright magical core
                     gc.setGlobalAlpha(1.0);
-                    gc.setFill(color.brighter());
+                    gc.setFill(color.brighter().brighter());
                     gc.fillOval(x + width * 0.25, y + height * 0.25, width * 0.5, height * 0.5);
+                    
+                    // Magical sparkles around the orb
+                    gc.setFill(Color.WHITE);
+                    for (int i = 0; i < 4; i++) {
+                        double angle = time + i * Math.PI / 2;
+                        double sparkleX = centerX + Math.cos(angle) * width * 0.8;
+                        double sparkleY = centerY + Math.sin(angle) * height * 0.8;
+                        gc.fillOval(sparkleX - 1, sparkleY - 1, 2, 2);
+                    }
                     
                     break;
                     
                 case EXPLOSIVE:
-                    // Draw a bomb-like shape
-                    gc.setFill(color);
+                    // Enhanced bomb with better details
+                    gc.setFill(color.darker());
                     gc.fillOval(x, y, width, height);
                     
-                    // Draw a fuse
+                    // Metallic rim
+                    gc.setStroke(Color.DARKGRAY);
+                    gc.setLineWidth(2);
+                    gc.strokeOval(x + 1, y + 1, width - 2, height - 2);
+                    
+                    // Sparking fuse with glow
+                    gc.setGlobalAlpha(0.7);
+                    gc.setStroke(Color.ORANGE);
+                    gc.setLineWidth(4);
+                    gc.strokeLine(x + width * 0.7, y - height * 0.2, x + width * 0.5, y + height * 0.2);
+                    
+                    gc.setGlobalAlpha(1.0);
                     gc.setStroke(Color.YELLOW);
                     gc.setLineWidth(2);
                     gc.strokeLine(x + width * 0.7, y - height * 0.2, x + width * 0.5, y + height * 0.2);
                     
+                    // Spark at fuse tip
+                    double sparkTime = System.currentTimeMillis() * 0.01;
+                    if (Math.sin(sparkTime) > 0) {
+                        gc.setFill(Color.WHITE);
+                        gc.fillOval(x + width * 0.7 - 2, y - height * 0.2 - 2, 4, 4);
+                    }
+                    
                     break;
                     
                 default:
-                    // Simple circle for other types
+                    // Enhanced default projectile
+                    gc.setGlobalAlpha(0.8);
                     gc.setFill(color);
                     gc.fillOval(x, y, width, height);
+                    
+                    gc.setGlobalAlpha(1.0);
+                    gc.setFill(color.brighter());
+                    gc.fillOval(x + width * 0.3, y + width * 0.3, width * 0.4, height * 0.4);
             }
         }
         

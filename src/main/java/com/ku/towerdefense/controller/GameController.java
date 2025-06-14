@@ -30,6 +30,8 @@ import javafx.util.Duration;
 import javafx.animation.Animation;
 import com.ku.towerdefense.model.wave.Wave;
 import com.ku.towerdefense.model.wave.WaveConfig;
+import com.ku.towerdefense.powerup.PowerUpManager;
+import com.ku.towerdefense.powerup.PowerUpType;
 
 /**
  * Main controller for the game, handling the game loop, entities, and game
@@ -54,9 +56,23 @@ public class GameController {
     private long waveStartTime = 0;
     private boolean isSpawningEnemies = false;
 
+    // Grace period for first wave
+    private static final long GRACE_PERIOD_MS = 4000; // 4 seconds
+    private boolean gracePeriodActive = false;
+    private Timeline gracePeriodTimer;
+
     // Game speed control
     private boolean speedAccelerated = false;
     private static final double SPEED_MULTIPLIER = 2.0;
+    
+    // Path flash system
+    private boolean pathFlashActive = false;
+    private long pathFlashStartTime = 0;
+    private static final long PATH_FLASH_DURATION = 3000; // 3 seconds
+    private double pathFlashAlpha = 0.0;
+    
+    // Power-up system
+    private PowerUpManager powerUpManager;
 
     // Listener for wave events
     private WaveCompletedListener onWaveCompletedListener;
@@ -80,6 +96,9 @@ public class GameController {
         this.playerLives = GameSettings.getInstance().getStartingLives();
         this.currentWave = 0;
         this.gameOver = false;
+        
+        // Initialize power-up system
+        this.powerUpManager = new PowerUpManager(this);
 
         // Initialize game loop
         gameLoop = new AnimationTimer() {
@@ -106,9 +125,24 @@ public class GameController {
     public void startGame() {
         // gameLoop.start(); // GameScreen handles AnimationTimer start/stop via its own
         // pause
-        if (currentWave == 0) { // Auto-start first wave
-            startNextWave();
+        if (currentWave == 0) { // Auto-start first wave with grace period
+            startFirstWaveWithGracePeriod();
         }
+    }
+
+    /**
+     * Starts the first wave after a 4-second grace period.
+     */
+    private void startFirstWaveWithGracePeriod() {
+        gracePeriodActive = true;
+        System.out.println("Starting grace period: 4 seconds to build towers before first wave...");
+        
+        gracePeriodTimer = new Timeline(new KeyFrame(Duration.millis(GRACE_PERIOD_MS), e -> {
+            gracePeriodActive = false;
+            System.out.println("Grace period ended. Starting first wave!");
+            startNextWave();
+        }));
+        gracePeriodTimer.play();
     }
 
     /**
@@ -118,6 +152,9 @@ public class GameController {
         // gameLoop.stop(); // GameScreen handles AnimationTimer
         if (waveTimer != null) {
             waveTimer.stop();
+        }
+        if (gracePeriodTimer != null) {
+            gracePeriodTimer.stop();
         }
     }
 
@@ -136,6 +173,9 @@ public class GameController {
                 waveTimerProgressOnPause = waveTimer.getCurrentTime();
                 waveTimer.pause();
             }
+            if (gracePeriodTimer != null && gracePeriodTimer.getStatus() == Animation.Status.RUNNING) {
+                gracePeriodTimer.pause();
+            }
         } else {
             if (waveTimer != null && waveTimer.getStatus() == Animation.Status.PAUSED) {
                 if (waveTimerProgressOnPause != null) {
@@ -144,11 +184,32 @@ public class GameController {
                     waveTimer.play(); // Should ideally not happen if paused correctly
                 }
             }
+            if (gracePeriodTimer != null && gracePeriodTimer.getStatus() == Animation.Status.PAUSED) {
+                gracePeriodTimer.play();
+            }
         }
     }
 
     public boolean isPaused() {
         return isPaused;
+    }
+
+    /**
+     * Check if the game is in the grace period.
+     *
+     * @return true if in grace period, false otherwise
+     */
+    public boolean isInGracePeriod() {
+        return gracePeriodActive;
+    }
+
+    /**
+     * Get the total number of waves from game settings.
+     *
+     * @return total number of waves
+     */
+    public int getTotalWaves() {
+        return GameSettings.getInstance().getTotalWaves();
     }
 
     /**
@@ -373,6 +434,12 @@ public class GameController {
             }
             return false;
         });
+        
+        // Update path flash animation
+        updatePathFlash();
+        
+        // Update power-up effects
+        powerUpManager.update(currentDeltaTime);
 
         // Check if wave is completed and all enemies are spawned
         // AND if waveTimer is not already running (to prevent multiple timers)
@@ -435,12 +502,36 @@ public class GameController {
         for (DroppedGold bag : activeGoldBags) {
             bag.render(gc);
         }
+        
+        // Render path flash (if active)
+        renderPathFlash(gc);
 
         // Additional UI rendering can be handled elsewhere
     }
 
     public void setPlayerGold(int i) {
         this.playerGold=i;
+    }
+    
+    /**
+     * Set the player's lives (for save/load system)
+     */
+    public void setPlayerLives(int lives) {
+        this.playerLives = lives;
+    }
+    
+    /**
+     * Set the current wave (for save/load system)
+     */
+    public void setCurrentWave(int wave) {
+        this.currentWave = wave;
+    }
+    
+    /**
+     * Set the game over state (for save/load system)
+     */
+    public void setGameOver(boolean gameOver) {
+        this.gameOver = gameOver;
     }
 
     /**
@@ -465,6 +556,14 @@ public class GameController {
     public void startNextWave() {
         // Enhanced debugging for enemy path issues
         System.out.println("startNextWave called - attempting to start wave " + (currentWave + 1));
+
+        // Check if we've reached the maximum waves
+        if (currentWave >= getTotalWaves()) {
+            System.out.println("All waves completed! Player has won the game!");
+            gameOver = true;
+            stopGame();
+            return;
+        }
 
         // Check if path exists
         if (gameMap.getEnemyPath() == null) {
@@ -511,6 +610,12 @@ public class GameController {
         // Increment wave counter
         currentWave++;
         System.out.println("Starting wave " + currentWave);
+        
+        // Update power-up manager with new wave
+        powerUpManager.setCurrentWave(currentWave);
+        
+        // ✨ TRIGGER PATH FLASH - Show players the enemy route!
+        startPathFlash();
 
         // Calculate enemy numbers
         int num = GameSettings.getInstance().getEnemiesPerGroup() * (1 + currentWave / 3); // Example scaling
@@ -711,6 +816,10 @@ public class GameController {
 
     public List<Enemy> getEnemies() {
         return enemies;
+    }
+
+    public List<Projectile> getProjectiles() {
+        return projectiles;
     }
 
     public int getPlayerGold() {
@@ -939,5 +1048,127 @@ public class GameController {
     // Getter for GameScreen to check gold bags for clicks
     public List<DroppedGold> getActiveGoldBags() {
         return activeGoldBags;
+    }
+    
+    // ===== SAVE/LOAD SYSTEM SUPPORT METHODS =====
+    
+    /**
+     * Get whether the game is currently between waves
+     */
+    public boolean isBetweenWaves() {
+        return betweenWaves;
+    }
+    
+    /**
+     * Set whether the game is between waves (for save/load)
+     */
+    public void setBetweenWaves(boolean betweenWaves) {
+        this.betweenWaves = betweenWaves;
+    }
+    
+    /**
+     * Get the wave start time
+     */
+    public long getWaveStartTime() {
+        return waveStartTime;
+    }
+    
+    /**
+     * Set the wave start time (for save/load)
+     */
+    public void setWaveStartTime(long waveStartTime) {
+        this.waveStartTime = waveStartTime;
+    }
+    
+    /**
+     * Get whether enemies are currently spawning
+     */
+    public boolean isSpawningEnemies() {
+        return isSpawningEnemies;
+    }
+    
+    /**
+     * Set whether enemies are spawning (for save/load)
+     */
+    public void setSpawningEnemies(boolean isSpawningEnemies) {
+        this.isSpawningEnemies = isSpawningEnemies;
+    }
+    
+    /**
+     * Set grace period active state (for save/load)
+     */
+    public void setGracePeriodActive(boolean gracePeriodActive) {
+        this.gracePeriodActive = gracePeriodActive;
+    }
+    
+    // ===== PATH FLASH SYSTEM =====
+    
+    /**
+     * Start the path flash animation to show players the enemy route
+     */
+    private void startPathFlash() {
+        pathFlashActive = true;
+        pathFlashStartTime = System.currentTimeMillis();
+        pathFlashAlpha = 1.0;
+        System.out.println("🌟 Path flash started! Showing enemy route for " + (PATH_FLASH_DURATION / 1000) + " seconds");
+    }
+    
+    /**
+     * Update the path flash animation
+     */
+    private void updatePathFlash() {
+        if (!pathFlashActive) return;
+        
+        long currentTime = System.currentTimeMillis();
+        long elapsed = currentTime - pathFlashStartTime;
+        
+        if (elapsed >= PATH_FLASH_DURATION) {
+            // Flash duration complete
+            pathFlashActive = false;
+            pathFlashAlpha = 0.0;
+            System.out.println("✨ Path flash ended - route hidden");
+        } else {
+            // Calculate pulsing alpha (creates a breathing effect)
+            double progress = (double) elapsed / PATH_FLASH_DURATION;
+            double pulseSpeed = 4.0; // How fast the pulse is
+            double basePulse = Math.sin(progress * pulseSpeed * Math.PI) * 0.3 + 0.7; // 0.4 to 1.0
+            
+            // Fade out over time
+            double fadeOut = 1.0 - (progress * 0.3); // Gradually reduce intensity
+            
+            pathFlashAlpha = basePulse * fadeOut;
+        }
+    }
+    
+    /**
+     * Render the path flash if active (currently disabled - no visual path shown)
+     */
+    public void renderPathFlash(GraphicsContext gc) {
+        // Path flash rendering disabled since there's only one path
+        // System infrastructure kept for potential future use
+        return;
+    }
+    
+    // ===== POWER-UP SYSTEM =====
+    
+    /**
+     * Get the power-up manager
+     */
+    public PowerUpManager getPowerUpManager() {
+        return powerUpManager;
+    }
+    
+    /**
+     * Activate a power-up (called from UI)
+     */
+    public boolean activatePowerUp(PowerUpType type) {
+        return powerUpManager.activatePowerUp(type);
+    }
+    
+    /**
+     * Check if a power-up can be used
+     */
+    public boolean canUsePowerUp(PowerUpType type) {
+        return powerUpManager.canUsePowerUp(type);
     }
 }

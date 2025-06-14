@@ -157,12 +157,19 @@ public class GameMap implements Serializable {
 
         final int TS = 32; // logic coords: 32 px per tile
         startPoint = new Point2D(startTile.getX() * TS + TS / 2, startTile.getY() * TS + TS / 2);
-        endPoint = new Point2D(endTile.getX() * TS + TS / 2, endTile.getY() * TS + TS / 2);
+        
+        // MODIFIED: Make enemies target the RIGHT SIDE of the castle (x+1, y) instead of bottom-left (x, y)
+        // Castle structure: END_POINT is at (x,y), so right side is at (x+1, y)
+        int castleRightX = endTile.getX() + 1; // Move one tile to the right
+        int castleRightY = endTile.getY();     // Same Y coordinate
+        endPoint = new Point2D(castleRightX * TS + TS / 2, castleRightY * TS + TS / 2);
+        
         startXY = new int[] { (int) startPoint.getX(), (int) startPoint.getY() };
         endXY = new int[] { (int) endPoint.getX(), (int) endPoint.getY() };
 
-        // Use BFS to find a path from start to end
-        List<int[]> pathPoints = findPathBFS(startTile, endTile);
+        // Use BFS to find a path from start to the tile adjacent to castle right side
+        // We need to find path to a walkable tile next to the castle right side
+        List<int[]> pathPoints = findPathBFS(startTile, endTile, castleRightX, castleRightY);
 
         // If no path found, show error and return
         if (pathPoints == null || pathPoints.isEmpty()) {
@@ -180,50 +187,20 @@ public class GameMap implements Serializable {
     }
 
     /**
-     * Uses Breadth-First Search to find a path from startTile to endTile following
-     * walkable
-     * tiles. The path search aims to reach a tile adjacent to or at the endTile.
+     * Uses Breadth-First Search to find a path from startTile to a walkable tile adjacent to the castle right side.
+     * The path search aims to reach a tile adjacent to the castle right side position.
      * The coordinates in the returned list are pixel coordinates representing the
      * center of each tile.
      *
      * @param startTile The tile where the path should begin.
-     * @param endTile   The tile where the path should end.
+     * @param endTile   The END_POINT tile (bottom-left of castle).
+     * @param castleRightX The x-coordinate of the castle right side (endTile.x + 1).
+     * @param castleRightY The y-coordinate of the castle right side (endTile.y).
      * @return List of [x,y] pixel coordinates for the path in tile-center space
      *         (e.g., tileX * 64 + 32).
      *         Returns null if no path is found.
-     *
-     *         REQUIRES:
-     *         - startTile is not null.
-     *         - endTile is not null.
-     *         - this.tiles (the GameMap's grid) is not null and initialized.
-     *         - this.width and this.height accurately reflect the dimensions of
-     *         this.tiles.
-     *         - Tiles with start and end point types are present on the map and
-     *         correspond to startTile and endTile.
-     *
-     *         MODIFIES:
-     *         - None (this method is side-effect free on the GameMap state, local
-     *         variables like visited and parent are used internally).
-     *
-     *         EFFECTS:
-     *         - If a path exists from startTile to a tile that is either endTile
-     *         itself (if considered walkable by the BFS logic for the purpose of
-     *         termination)
-     *         or directly adjacent to endTile, following tiles for which
-     *         tile.isWalkable() is true (or it's the endTile itself):
-     *         - Returns a List<int[]> where each int[] is a pair [x_pixel,
-     *         y_pixel].
-     *         - These coordinates represent the center of each tile in the path.
-     *         - The path starts at the center of startTile and ends at the center
-     *         of the last tile identified by the BFS
-     *         (which could be adjacent to endTile or endTile itself).
-     *         - The TILE_SIZE used for pixel calculation within this method is 64.
-     *         - If no such path is found, returns null.
-     *         - The search uses a Breadth-First Search algorithm.
-     *         - If startTile or endTile are outside map boundaries, behavior is
-     *         implicitly handled by boundary checks, likely leading to no path.
      */
-    public List<int[]> findPathBFS(Tile startTile, Tile endTile) {
+    public List<int[]> findPathBFS(Tile startTile, Tile endTile, int castleRightX, int castleRightY) {
         final int TS = 64; // pixel size of tiles
 
         // Directions: right, down, left, up
@@ -238,22 +215,21 @@ public class GameMap implements Serializable {
         queue.add(new int[] { startTile.getX(), startTile.getY() });
         visited[startTile.getX()][startTile.getY()] = true;
 
-        // Target coordinates - the exact end tile
-        int exactTargetX = endTile.getX();
-        int exactTargetY = endTile.getY();
-
-        boolean pathFound = false;
+        // Find a walkable tile adjacent to the castle right side
+        int finalTargetX = -1;
+        int finalTargetY = -1;
 
         // BFS loop
-        while (!queue.isEmpty()) { // Loop until queue is empty or path is found
+        while (!queue.isEmpty()) {
             int[] current = queue.poll();
             int cx = current[0];
             int cy = current[1];
 
-            // Check if we've reached the exact end tile
-            if (cx == exactTargetX && cy == exactTargetY) {
-                pathFound = true;
-                break; // Path found, exit loop
+            // Check if current tile is adjacent to castle right side
+            if (isAdjacentToCastleRightSide(cx, cy, castleRightX, castleRightY)) {
+                finalTargetX = cx;
+                finalTargetY = cy;
+                break; // Found a path to adjacent tile, exit loop
             }
 
             // Check all four directions
@@ -269,9 +245,9 @@ public class GameMap implements Serializable {
                 if (visited[nx][ny])
                     continue;
 
-                // Only consider walkable tiles OR the end point itself
+                // Only consider walkable tiles
                 Tile nextTile = tiles[nx][ny];
-                if (!nextTile.isWalkable() && !(nx == exactTargetX && ny == exactTargetY))
+                if (!nextTile.isWalkable())
                     continue;
 
                 // Mark as visited and save parent
@@ -283,17 +259,17 @@ public class GameMap implements Serializable {
             }
         }
 
-        // If we didn't find a path to the exact end tile
-        if (!pathFound) {
+        // If we didn't find a path to any tile adjacent to castle right side
+        if (finalTargetX == -1 || finalTargetY == -1) {
             return null;
         }
 
-        // Reconstruct the path from the exact end tile to start
+        // Reconstruct the path from the final target to start
         List<int[]> reversePath = new ArrayList<>();
-        int reconstructX = exactTargetX;
-        int reconstructY = exactTargetY;
+        int reconstructX = finalTargetX;
+        int reconstructY = finalTargetY;
 
-        // Start with the end point
+        // Start with the final target point
         reversePath.add(new int[] { reconstructX * TS + TS / 2, reconstructY * TS + TS / 2 });
 
         // Work backwards to the start
@@ -310,7 +286,29 @@ public class GameMap implements Serializable {
             forwardPath.add(reversePath.get(i));
         }
 
+        // Add the castle right side as the final destination
+        forwardPath.add(new int[] { castleRightX * TS + TS / 2, castleRightY * TS + TS / 2 });
+
         return forwardPath;
+    }
+
+    /**
+     * Check if a tile is adjacent to the castle right side position.
+     * Adjacent means directly touching (not diagonal).
+     */
+    private boolean isAdjacentToCastleRightSide(int tileX, int tileY, int castleRightX, int castleRightY) {
+        // Check all four directions from the castle right side
+        int[][] adjacentOffsets = { { -1, 0 }, { 1, 0 }, { 0, -1 }, { 0, 1 } }; // left, right, up, down
+        
+        for (int[] offset : adjacentOffsets) {
+            int adjX = castleRightX + offset[0];
+            int adjY = castleRightY + offset[1];
+            
+            if (tileX == adjX && tileY == adjY) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public GamePath getEnemyPath() {
@@ -363,15 +361,7 @@ public class GameMap implements Serializable {
                 }
             }
         }
-        if (enemyPath != null) {
-            var pts = enemyPath.getPoints();
-            gc.setStroke(Color.YELLOW);
-            gc.setLineWidth(2);
-            gc.setGlobalAlpha(0.35);
-            for (int i = 0; i < pts.size() - 1; i++)
-                gc.strokeLine(pts.get(i).getX(), pts.get(i).getY(), pts.get(i + 1).getX(), pts.get(i + 1).getY());
-            gc.setGlobalAlpha(1);
-        }
+        // Path rendering removed - now handled by flash system in GameController
         generatePath();
     }
 

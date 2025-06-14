@@ -287,18 +287,79 @@ public class GamePlayScreen extends BorderPane {
     }
     
     /**
-     * Show an alert dialog.
+     * Show an alert dialog with enhanced styling and proper fullscreen handling.
      * 
      * @param title the title of the alert
      * @param message the message to display
      */
     private void showAlert(String title, String message) {
         Platform.runLater(() -> {
-            Alert alert = new Alert(Alert.AlertType.INFORMATION);
-            alert.setTitle(title);
-            alert.setHeaderText(null);
-            alert.setContentText(message);
-            alert.showAndWait();
+            try {
+                Alert.AlertType type = Alert.AlertType.INFORMATION;
+                if (title.toLowerCase().contains("error") || title.toLowerCase().contains("failed")) {
+                    type = Alert.AlertType.ERROR;
+                } else if (title.toLowerCase().contains("success") || title.toLowerCase().contains("saved")
+                        || title.toLowerCase().contains("loaded")) {
+                    type = Alert.AlertType.INFORMATION;
+                } else if (title.toLowerCase().contains("game over")) {
+                    type = Alert.AlertType.WARNING;
+                }
+
+                Alert alert = new Alert(type);
+                alert.setTitle(title);
+                alert.setHeaderText(null);
+                alert.setContentText(message);
+
+                // Apply styling to match editor style
+                try {
+                    String cssPath = getClass().getResource("/css/style.css").toExternalForm();
+                    alert.getDialogPane().getStylesheets().add(cssPath);
+                    alert.getDialogPane().getStyleClass().add("dialog-pane");
+                } catch (Exception e) {
+                    System.err.println("Could not load CSS for gameplay dialog: " + e.getMessage());
+                }
+
+                // Add type-specific styling
+                if (alert.getAlertType() == Alert.AlertType.ERROR) {
+                    alert.getDialogPane().getStyleClass().add("error-dialog");
+                } else if (alert.getAlertType() == Alert.AlertType.WARNING) {
+                    alert.getDialogPane().getStyleClass().add("warning-dialog");
+                } else if (alert.getAlertType() == Alert.AlertType.INFORMATION) {
+                    alert.getDialogPane().getStyleClass().add("info-dialog");
+                }
+
+                // CRITICAL: Ensure dialog shows on top WITHOUT exiting fullscreen during gameplay
+                alert.initOwner(primaryStage);
+                alert.initModality(javafx.stage.Modality.APPLICATION_MODAL);
+                
+                // Prevent fullscreen exit by keeping dialog centered and properly sized
+                alert.setResizable(false);
+                alert.getDialogPane().setPrefWidth(400);
+                alert.getDialogPane().setMinWidth(400);
+                alert.getDialogPane().setPrefHeight(200);
+                
+                // Show in center of parent window, not system desktop
+                alert.showAndWait();
+                
+            } catch (Exception e) {
+                // Fallback if alert fails - log to console instead of crashing
+                System.err.println("Gameplay Alert Error - " + title + ": " + message);
+                System.err.println("Exception showing gameplay alert: " + e.getMessage());
+                e.printStackTrace();
+                
+                // Try a minimal system dialog as last resort
+                try {
+                    Alert fallbackAlert = new Alert(Alert.AlertType.INFORMATION);
+                    fallbackAlert.setTitle("Game Alert");
+                    fallbackAlert.setContentText(title + ": " + message);
+                    fallbackAlert.initOwner(primaryStage);
+                    fallbackAlert.setResizable(false);
+                    fallbackAlert.showAndWait();
+                } catch (Exception ex) {
+                    // If even that fails, just log it
+                    System.err.println("Complete gameplay dialog failure: " + ex.getMessage());
+                }
+            }
         });
     }
 } 

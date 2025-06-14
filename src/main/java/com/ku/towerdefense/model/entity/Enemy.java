@@ -195,26 +195,117 @@ public abstract class Enemy extends Entity implements Serializable {
 
     private static void loadEffectIcons() {
         try {
-            String snowflakePath = "/Asset_pack/Effects/snow_flake_icon.png"; // Corrected name
-            snowflakeIcon = new Image(Enemy.class.getResourceAsStream(snowflakePath));
-            if (snowflakeIcon != null && !snowflakeIcon.isError()) {
-                System.out.println("Loaded snow_flake_icon.png");
+            // Load snowflake icon and remove white background
+            String snowflakePath = "/Asset_pack/Effects/snow_flake_icon.png";
+            try {
+                Image originalSnow = new Image(Enemy.class.getResourceAsStream(snowflakePath));
+                if (originalSnow != null && !originalSnow.isError()) {
+                    snowflakeIcon = removeWhiteBackground(originalSnow);
+                    System.out.println("Loaded and processed snowflake icon from: " + snowflakePath);
             } else {
-                System.err.println("Error loading snow_flake_icon.png"
-                        + (snowflakeIcon == null ? " - Stream is null" : " - Image has error"));
+                    throw new Exception("Failed to load original image");
+                }
+            } catch (Exception e) {
+                System.out.println("Creating fallback snowflake icon due to: " + e.getMessage());
+                snowflakeIcon = createFallbackIcon(javafx.scene.paint.Color.LIGHTBLUE, 16);
             }
 
-            String thunderBoltPath = "/Asset_pack/Effects/thunder_icon.png"; // Corrected name
-            thunderIcon = new Image(Enemy.class.getResourceAsStream(thunderBoltPath));
-            if (thunderIcon != null && !thunderIcon.isError()) {
-                System.out.println("Loaded thunder_icon.png for synergy");
+            // Load thunder icon and remove white background
+            String thunderPath = "/Asset_pack/Effects/thunder_icon.png";
+            try {
+                Image originalThunder = new Image(Enemy.class.getResourceAsStream(thunderPath));
+                if (originalThunder != null && !originalThunder.isError()) {
+                    thunderIcon = removeWhiteBackground(originalThunder);
+                    System.out.println("Loaded and processed thunder icon from: " + thunderPath);
             } else {
-                System.err.println("Error loading thunder_icon.png for synergy"
-                        + (thunderIcon == null ? " - Stream is null" : " - Image has error"));
+                    throw new Exception("Failed to load original image");
+                }
+            } catch (Exception e) {
+                System.out.println("Creating fallback thunder icon due to: " + e.getMessage());
+                thunderIcon = createFallbackIcon(javafx.scene.paint.Color.YELLOW, 16);
             }
+            
         } catch (Exception e) {
             System.err.println("Exception loading effect icons: " + e.getMessage());
             e.printStackTrace();
+            // Create fallback icons
+            snowflakeIcon = createFallbackIcon(javafx.scene.paint.Color.LIGHTBLUE, 16);
+            thunderIcon = createFallbackIcon(javafx.scene.paint.Color.YELLOW, 16);
+        }
+    }
+    
+    /**
+     * Remove white background from an image by making white pixels transparent
+     */
+    private static Image removeWhiteBackground(Image originalImage) {
+        try {
+            int width = (int) originalImage.getWidth();
+            int height = (int) originalImage.getHeight();
+            
+            javafx.scene.canvas.Canvas canvas = new javafx.scene.canvas.Canvas(width, height);
+            javafx.scene.canvas.GraphicsContext gc = canvas.getGraphicsContext2D();
+            
+            // Clear to transparent
+            gc.clearRect(0, 0, width, height);
+            
+            // Get pixel reader from original image
+            javafx.scene.image.PixelReader pixelReader = originalImage.getPixelReader();
+            if (pixelReader == null) {
+                return originalImage; // Return original if can't read pixels
+            }
+            
+            // Create writable image
+            javafx.scene.image.WritableImage writableImage = new javafx.scene.image.WritableImage(width, height);
+            javafx.scene.image.PixelWriter pixelWriter = writableImage.getPixelWriter();
+            
+            // Process each pixel
+            for (int y = 0; y < height; y++) {
+                for (int x = 0; x < width; x++) {
+                    javafx.scene.paint.Color color = pixelReader.getColor(x, y);
+                    
+                    // If pixel is white or very light, make it transparent
+                    if (color.getRed() > 0.9 && color.getGreen() > 0.9 && color.getBlue() > 0.9) {
+                        pixelWriter.setColor(x, y, javafx.scene.paint.Color.TRANSPARENT);
+                    } else {
+                        pixelWriter.setColor(x, y, color);
+                    }
+                }
+            }
+            
+            return writableImage;
+        } catch (Exception e) {
+            System.err.println("Failed to remove white background: " + e.getMessage());
+            return originalImage; // Return original on error
+        }
+    }
+    
+    /**
+     * Create a simple colored circle as a fallback icon with transparent background
+     */
+    private static Image createFallbackIcon(javafx.scene.paint.Color color, int size) {
+        try {
+            javafx.scene.canvas.Canvas canvas = new javafx.scene.canvas.Canvas(size, size);
+            javafx.scene.canvas.GraphicsContext gc = canvas.getGraphicsContext2D();
+            
+            // Clear to ensure transparent background
+            gc.clearRect(0, 0, size, size);
+            
+            // Fill with solid color circle
+            gc.setFill(color);
+            gc.fillOval(2, 2, size - 4, size - 4);
+            
+            // Add a dark border for visibility
+            gc.setStroke(javafx.scene.paint.Color.BLACK);
+            gc.setLineWidth(1);
+            gc.strokeOval(2, 2, size - 4, size - 4);
+            
+            // Create with transparent background
+            javafx.scene.SnapshotParameters params = new javafx.scene.SnapshotParameters();
+            params.setFill(javafx.scene.paint.Color.TRANSPARENT);
+            return canvas.snapshot(params, null);
+        } catch (Exception e) {
+            System.err.println("Failed to create fallback icon: " + e.getMessage());
+            return null;
         }
     }
 
@@ -373,10 +464,10 @@ public abstract class Enemy extends Entity implements Serializable {
         // Draw health bar
         renderHealthBar(gc);
 
-        // Render status icons
-        double iconX = this.x + this.width; // Start right of the enemy
-        double iconY = this.y;
-        double iconSize = 16; // Or dynamic based on enemy height/health bar
+        // Render status icons very close to the enemy
+        double iconX = this.x + this.width - 48; // Position much closer, more overlap
+        double iconY = this.y - 2; // Position almost touching enemy
+        double iconSize = 16; // Back to original size
         int iconOffset = 0;
 
         if (isSlowed && snowflakeIcon != null) {
@@ -597,6 +688,13 @@ public abstract class Enemy extends Entity implements Serializable {
 
     public double getPathProgress() {
         return pathProgress;
+    }
+    
+    /**
+     * Set the path progress (for save/load system)
+     */
+    public void setPathProgress(double pathProgress) {
+        this.pathProgress = Math.max(0.0, Math.min(1.0, pathProgress));
     }
 
     public void setImageFile(String imageFile) {

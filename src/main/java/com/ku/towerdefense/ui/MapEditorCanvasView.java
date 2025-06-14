@@ -17,11 +17,13 @@ import javafx.scene.input.MouseEvent; // Import MouseEvent
 import javafx.scene.input.MouseButton; // Import MouseButton
 import javafx.scene.input.ScrollEvent; // Import ScrollEvent
 import javafx.scene.Cursor; // Import Cursor
+import javafx.scene.ImageCursor; // Import ImageCursor
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.scene.layout.Priority; // Import Priority
 import javafx.scene.paint.Color;
 import javafx.scene.transform.Scale;
+import javafx.scene.image.Image;
 
 /**
  * Manages the map canvas, rendering, zoom, and placement logic for the Map
@@ -66,23 +68,34 @@ public class MapEditorCanvasView extends VBox {
         this.zoomLabel = (Label) zoomControls.getChildren().get(1); // Store label reference
 
         // Create canvas and group
-        mapCanvas = new Canvas(); // Initial size will be managed by layout
-        // Group canvasGroup = new Group(mapCanvas); // No longer needed if scaling via
-        // GC
-
-        // Make mapCanvas fill available space in VBox
+        mapCanvas = new Canvas(800, 600); // Set initial size to prevent zero-size issues
+        
+        // Set custom cursor on canvas initialization
+        ImageCursor customCursor = UIAssets.getCustomCursor();
+        if (customCursor != null) {
+            mapCanvas.setCursor(customCursor);
+        }
+        
+        // Make mapCanvas fill available space in VBox with better binding
         VBox.setVgrow(mapCanvas, Priority.ALWAYS);
-        mapCanvas.widthProperty().bind(
-                this.widthProperty()
-                        .subtract(this.paddingProperty().get().getLeft())
-                        .subtract(this.paddingProperty().get().getRight()));
-        mapCanvas.heightProperty().bind(
-                this.heightProperty()
-                        .subtract(this.paddingProperty().get().getTop())
-                        .subtract(this.paddingProperty().get().getBottom())
-                        .subtract(zoomControls.heightProperty()) // Account for zoom controls height
-                        .subtract(this.getSpacing()) // Account for VBox spacing
-        );
+        
+        // Simplified binding approach - bind to parent size with proper calculations
+        this.widthProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal.doubleValue() > 100) { // Avoid tiny sizes
+                mapCanvas.setWidth(newVal.doubleValue() - 20); // Account for padding
+                centerAndZoomMap(false); // Recenter when size changes
+            }
+        });
+        
+        this.heightProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal.doubleValue() > 100) { // Avoid tiny sizes
+                double availableHeight = newVal.doubleValue() - zoomControls.getHeight() - 40; // Account for controls and padding
+                if (availableHeight > 100) {
+                    mapCanvas.setHeight(availableHeight);
+                    centerAndZoomMap(false); // Recenter when size changes
+                }
+            }
+        });
 
         // Add scroll event for zooming directly to mapCanvas
         mapCanvas.setOnScroll(event -> {
@@ -114,31 +127,12 @@ public class MapEditorCanvasView extends VBox {
         // Add canvas directly, after zoom controls
         getChildren().addAll(zoomControls, mapCanvas);
 
-        // Listen to canvas size changes to ensure initial and subsequent renders
-        mapCanvas.widthProperty().addListener((obs, oldVal, newVal) -> {
-            if (newVal.doubleValue() > 0 && mapCanvas.getHeight() > 0) {
-                System.out.println("Canvas width changed to: " + newVal + ", centering and rendering map.");
-                centerAndZoomMap(true); // Fit and center when canvas size is known
-            }
-        });
-        mapCanvas.heightProperty().addListener((obs, oldVal, newVal) -> {
-            if (newVal.doubleValue() > 0 && mapCanvas.getWidth() > 0) {
-                System.out.println("Canvas height changed to: " + newVal + ", centering and rendering map.");
-                centerAndZoomMap(true); // Fit and center when canvas size is known
-            }
-        });
-
         // Initial setup
-        // applyZoom(); // Called by centerAndZoomMap via listeners
         setupMouseHandlers();
-        // renderMap(); // Called by centerAndZoomMap via listeners
-        // Explicit initial render might be needed if listeners don't fire immediately
-        // or if canvas has initial 0,0 size then gets updated.
-        // Let's rely on listeners first, but keep this in mind.
+        
+        // Ensure initial render happens when the view is shown
         javafx.application.Platform.runLater(() -> {
-            if (mapCanvas.getWidth() > 0 && mapCanvas.getHeight() > 0) {
-                centerAndZoomMap(true);
-            } // else listeners will catch it.
+            centerAndZoomMap(true);
         });
     }
 
@@ -417,46 +411,53 @@ public class MapEditorCanvasView extends VBox {
     }
 
     private void handleMousePressForPanning(MouseEvent event) {
-        if (event.getButton() == MouseButton.PRIMARY) {
-            lastPanX = event.getX(); // Coordinates relative to the (scaled) canvas
+        if (event.getButton() == MouseButton.SECONDARY) {
+            // Right mouse button starts panning
+            isPanning = true;
+            lastPanX = event.getX();
             lastPanY = event.getY();
-            // isPanning = false; // Will be set to true on first drag
-            // Do not consume here, let click handler decide based on dragging
-        } else if (event.getButton() == MouseButton.SECONDARY) {
-            // Allow right-click to pass through to the MOUSE_CLICKED handler for grass
-            // placement
+            
+            // Use custom cursor for panning instead of system MOVE cursor
+            ImageCursor customCursor = UIAssets.getCustomCursor();
+            if (customCursor != null) {
+                mapCanvas.setCursor(customCursor);
+            } else {
+                mapCanvas.setCursor(Cursor.MOVE); // Fallback only if custom cursor unavailable
+            }
+            
+            event.consume();
         }
     }
 
     private void handleMouseDragForPanning(MouseEvent event) {
-        if (event.getButton() == MouseButton.PRIMARY) {
-            if (!isPanning) {
-                isPanning = true;
-                mapCanvas.setCursor(Cursor.MOVE);
-            }
-
+        if (event.getButton() == MouseButton.SECONDARY && isPanning) {
             double deltaX = event.getX() - lastPanX;
             double deltaY = event.getY() - lastPanY;
 
-            // Update view offsets directly
             viewOffsetX += deltaX;
             viewOffsetY += deltaY;
 
             lastPanX = event.getX();
             lastPanY = event.getY();
 
-            renderMap(); // Re-render to show pan
+            renderMap();
             event.consume();
         }
     }
 
     private void handleMouseReleaseForPanning(MouseEvent event) {
-        if (event.getButton() == MouseButton.PRIMARY) {
-            if (isPanning) {
-                mapCanvas.setCursor(Cursor.DEFAULT);
-                isPanning = false;
-                event.consume(); // Consume if it was a pan to prevent click handler tile placement
+        if (event.getButton() == MouseButton.SECONDARY && isPanning) {
+            isPanning = false;
+            
+            // Restore custom cursor after panning instead of DEFAULT cursor
+            ImageCursor customCursor = UIAssets.getCustomCursor();
+            if (customCursor != null) {
+                mapCanvas.setCursor(customCursor);
+            } else {
+                mapCanvas.setCursor(Cursor.DEFAULT); // Fallback only if custom cursor unavailable
             }
+            
+            event.consume();
         }
     }
 
@@ -617,24 +618,48 @@ public class MapEditorCanvasView extends VBox {
     }
 
     private void handleCastlePlacement(int x, int y) {
+        // Check if 2x2 structure fits
         if (x + 1 >= gameMap.getWidth() || y + 1 >= gameMap.getHeight()) {
-            showAlert("Invalid placement", "Castle must fit entirely on the map.");
+            showAlert("Invalid Castle Placement", 
+                "Castle doesn't fit on map!\n\n" +
+                "❌ Castle structure extends beyond map boundaries at position (" + (x+1) + "," + (y+1) + ")\n" +
+                "✅ Solution: Move the Castle away from the map edges\n\n" +
+                "💡 Tip: Castles need a 2x2 area - leave space from map borders");
             return;
         }
-        // validate 2×2 grass
-        for (int dx = 0; dx <= 1; dx++)
-            for (int dy = 0; dy <= 1; dy++)
-                if (gameMap.getTileType(x + dx, y + dy) != TileType.GRASS) {
-                    showAlert("Invalid placement", "Castle must be placed on 2×2 grass.");
+
+        // Check if all 4 tiles are grass
+        for (int i = 0; i < 2; i++) {
+            for (int j = 0; j < 2; j++) {
+                Tile tile = gameMap.getTile(x + i, y + j);
+                if (tile == null || tile.getType() != TileType.GRASS) {
+                    showAlert("Invalid Castle Placement", 
+                        "Castle needs clear grass area!\n\n" +
+                        "❌ Castle requires all 4 tiles to be grass at position (" + (x+1) + "," + (y+1) + ")\n" +
+                        "✅ Solution: Clear the 2x2 area by placing grass tiles first\n\n" +
+                        "💡 Tip: Select 'Grass' from palette and clear the area before placing Castle");
                     return;
                 }
+            }
+        }
 
-        // Check if there's at least one adjacent walkable path tile
+        // Check if castle right side has adjacent path tiles
+        // Castle structure: END_POINT at (x,y), right side at (x+1, y)
+        int castleRightX = x + 1;
+        int castleRightY = y;
         boolean hasAdjacentPath = false;
-        int[][] directions = { { -1, 0 }, { 0, -1 }, { 2, 0 }, { 0, 2 } }; // Left, up, right, down from castle
-        for (int[] dir : directions) {
-            int nx = x + dir[0];
-            int ny = y + dir[1];
+        
+        // Check tiles adjacent to castle right side specifically
+        int[][] rightSideDirections = { 
+            { castleRightX - 1, castleRightY },     // Left of right side (back toward castle center)
+            { castleRightX + 1, castleRightY },     // Right of right side (outside castle)
+            { castleRightX, castleRightY - 1 },     // Above right side
+            { castleRightX, castleRightY + 1 }      // Below right side
+        };
+        
+        for (int[] pos : rightSideDirections) {
+            int nx = pos[0];
+            int ny = pos[1];
             if (nx >= 0 && nx < gameMap.getWidth() && ny >= 0 && ny < gameMap.getHeight()) {
                 Tile tile = gameMap.getTile(nx, ny);
                 if (tile != null && tile.isWalkable()) {
@@ -645,7 +670,11 @@ public class MapEditorCanvasView extends VBox {
         }
 
         if (!hasAdjacentPath) {
-            showAlert("Invalid placement", "Castle must be adjacent to a path tile for enemies to reach it.");
+            showAlert("Invalid Castle Placement", 
+                "Castle needs adjacent path at entrance!\n\n" +
+                "❌ No path tiles found adjacent to Castle right side (entrance) at position (" + (castleRightX+1) + "," + (castleRightY+1) + ")\n" +
+                "✅ Solution: Place path tiles next to the Castle's right side\n\n" +
+                "💡 Tip: Enemies enter the Castle from the right side - ensure there's a path connection there");
             return;
         }
 
@@ -672,7 +701,11 @@ public class MapEditorCanvasView extends VBox {
         // Validate edge placement
         boolean onEdge = (x == 0 || x == gameMap.getWidth() - 1 || y == 0 || y == gameMap.getHeight() - 1);
         if (!onEdge) {
-            showAlert("Invalid Placement", "Start Point must be placed on the edge of the map.");
+            showAlert("Invalid Start Point Placement", 
+                "Start Point must be at map edge!\n\n" +
+                "❌ Cannot place Start Point at position (" + (x+1) + "," + (y+1) + ") - it's in the center\n" +
+                "✅ Solution: Place the Start Point on any edge tile of the map\n\n" +
+                "💡 Tip: Enemies spawn at the Start Point and need to enter from the map edge");
             return;
         }
 
@@ -683,7 +716,11 @@ public class MapEditorCanvasView extends VBox {
                 targetTile.getType() == TileType.CASTLE2 ||
                 targetTile.getType() == TileType.CASTLE3 ||
                 targetTile.getType() == TileType.CASTLE4)) {
-            showAlert("Invalid Placement", "Start Point cannot overlap with the Castle/End Point.");
+            showAlert("Invalid Start Point Placement", 
+                "Cannot place Start Point on Castle!\n\n" +
+                "❌ Start Point cannot overlap with Castle structures\n" +
+                "✅ Solution: Choose a different edge location away from the Castle\n\n" +
+                "💡 Tip: Start and End points must be separate for a valid path");
             return;
         }
 
@@ -703,7 +740,11 @@ public class MapEditorCanvasView extends VBox {
         }
 
         if (!hasAdjacentPath) {
-            showAlert("Invalid Placement", "Start Point must be adjacent to a path tile.");
+            showAlert("Invalid Start Point Placement", 
+                "Start Point needs adjacent path!\n\n" +
+                "❌ No path tiles found next to position (" + (x+1) + "," + (y+1) + ")\n" +
+                "✅ Solution: Place path tiles adjacent to the Start Point\n\n" +
+                "💡 Tip: Enemies need to immediately enter a path when they spawn");
             return;
         }
 
@@ -828,12 +869,85 @@ public class MapEditorCanvasView extends VBox {
         System.out.println("Cleared castle remnants around (" + x + "," + y + ")");
     }
 
-    // Simple alert helper
+    // Enhanced alert helper - matches MapEditorScreen behavior
     private void showAlert(String title, String content) {
-        Alert alert = new Alert(Alert.AlertType.INFORMATION);
-        alert.setTitle(title);
-        alert.setHeaderText(null);
-        alert.setContentText(content);
-        alert.showAndWait();
+        try {
+            Alert.AlertType type = Alert.AlertType.INFORMATION;
+            if (title.toLowerCase().contains("error") || title.toLowerCase().contains("failed")) {
+                type = Alert.AlertType.ERROR;
+            } else if (title.toLowerCase().contains("success") || title.toLowerCase().contains("saved")
+                    || title.toLowerCase().contains("deleted")) {
+                type = Alert.AlertType.INFORMATION;
+            } else if (title.toLowerCase().contains("confirm")) {
+                type = Alert.AlertType.CONFIRMATION;
+            }
+
+            Alert alert = new Alert(type);
+            alert.setTitle(title);
+            alert.setHeaderText(null);
+            alert.setContentText(content);
+
+            // Apply styling to match main editor
+            try {
+                String cssPath = getClass().getResource("/css/style.css").toExternalForm();
+                alert.getDialogPane().getStylesheets().add(cssPath);
+                alert.getDialogPane().getStyleClass().add("dialog-pane");
+            } catch (Exception e) {
+                System.err.println("Could not load CSS for canvas dialog: " + e.getMessage());
+            }
+
+            // Add type-specific styling
+            if (alert.getAlertType() == Alert.AlertType.ERROR) {
+                alert.getDialogPane().getStyleClass().add("error-dialog");
+            } else if (alert.getAlertType() == Alert.AlertType.CONFIRMATION) {
+                alert.getDialogPane().getStyleClass().add("confirmation-dialog");
+            } else if (alert.getAlertType() == Alert.AlertType.INFORMATION) {
+                alert.getDialogPane().getStyleClass().add("info-dialog");
+            }
+
+            // CRITICAL: Ensure dialog shows on top WITHOUT exiting fullscreen
+            // Find the primary stage by traversing up the scene graph
+            javafx.stage.Stage ownerStage = null;
+            try {
+                javafx.stage.Window window = this.getScene().getWindow();
+                if (window instanceof javafx.stage.Stage) {
+                    ownerStage = (javafx.stage.Stage) window;
+                }
+            } catch (Exception e) {
+                System.err.println("Could not find owner stage: " + e.getMessage());
+            }
+
+            if (ownerStage != null) {
+                alert.initOwner(ownerStage);
+            }
+            alert.initModality(javafx.stage.Modality.APPLICATION_MODAL);
+            
+            // Prevent fullscreen exit by keeping dialog centered and properly sized
+            alert.setResizable(false);
+            alert.getDialogPane().setPrefWidth(400);
+            alert.getDialogPane().setMinWidth(400);
+            alert.getDialogPane().setPrefHeight(200);
+            
+            // Show in center of parent window, not system desktop
+            alert.showAndWait();
+            
+        } catch (Exception e) {
+            // Fallback if alert fails - log to console instead of crashing
+            System.err.println("Canvas Alert Error - " + title + ": " + content);
+            System.err.println("Exception showing canvas alert: " + e.getMessage());
+            e.printStackTrace();
+            
+            // Try a minimal system dialog as last resort
+            try {
+                Alert fallbackAlert = new Alert(Alert.AlertType.ERROR);
+                fallbackAlert.setTitle("Map Editor Alert");
+                fallbackAlert.setContentText(title + ": " + content);
+                fallbackAlert.setResizable(false);
+                fallbackAlert.showAndWait();
+            } catch (Exception ex) {
+                // If even that fails, just log it
+                System.err.println("Complete canvas dialog failure: " + ex.getMessage());
+            }
+        }
     }
 }

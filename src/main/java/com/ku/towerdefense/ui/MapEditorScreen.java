@@ -228,26 +228,40 @@ public class MapEditorScreen extends BorderPane {
                 TileType type = currentMap.getTileType(x, y);
                 if (type == TileType.START_POINT) {
                     if (hasStart) {
-                        showAlert("Validation Error", "Multiple Start Points found. Only one allowed.");
+                        showAlert("Map Validation Error", 
+                            "Multiple Start Points detected!\n\n" +
+                            "❌ Found more than one Start Point tile\n" +
+                            "✅ Solution: Keep only ONE Start Point on your map\n\n" +
+                            "💡 Tip: Use the 'Set Start' button to properly place a single start point.");
                         return false;
                     }
                     hasStart = true;
                     startPoint = new Point(x, y);
                 } else if (type == TileType.END_POINT) {
                     if (hasEnd) {
-                        showAlert("Validation Error", "Multiple End Points (Castle bases) found. Only one allowed.");
+                        showAlert("Map Validation Error", 
+                            "Multiple End Points detected!\n\n" +
+                            "❌ Found more than one Castle structure\n" +
+                            "✅ Solution: Keep only ONE Castle (2x2 End Point) on your map\n\n" +
+                            "💡 Tip: A Castle serves as the enemy target - only one is needed.");
                         return false;
                     }
                     if (!isCastleComplete(x, y)) {
-                        showAlert("Validation Error", "Incomplete or invalid Castle structure found at (" + x + "," + y
-                                + "). Ensure a full 2x2 castle is placed on Grass.");
+                        showAlert("Map Validation Error", 
+                            "Incomplete Castle structure!\n\n" +
+                            "❌ Castle at position (" + (x+1) + "," + (y+1) + ") is not properly constructed\n" +
+                            "✅ Solution: Ensure the Castle is a complete 2x2 structure\n\n" +
+                            "💡 Tip: Place 4 Castle tiles in a square formation on grass tiles.");
                         return false;
                     }
                     hasEnd = true;
                     endPointAdjacent = findAdjacentWalkable(x, y);
                     if (endPointAdjacent == null) {
-                        showAlert("Validation Error",
-                                "Castle at (" + x + "," + y + ") must have an adjacent Path tile for the enemy route.");
+                        showAlert("Map Validation Error", 
+                            "Castle is not accessible!\n\n" +
+                            "❌ Castle at position (" + (x+1) + "," + (y+1) + ") has no adjacent path tiles\n" +
+                            "✅ Solution: Place at least one path tile next to the Castle\n\n" +
+                            "💡 Tip: Enemies need a path tile to reach the Castle entrance.");
                         return false;
                     }
                 }
@@ -270,32 +284,89 @@ public class MapEditorScreen extends BorderPane {
                     break;
             }
             if (!hasStart) {
-                showAlert("Validation Error", "No Start Point or valid edge Path tile found on the map.");
+                showAlert("Map Validation Error", 
+                    "No Start Point found!\n\n" +
+                    "❌ Your map is missing a Start Point where enemies spawn\n" +
+                    "✅ Solution: Add a Start Point at the edge of your map\n\n" +
+                    "💡 How to fix:\n" +
+                    "   • Use the 'Set Start' button in the toolbar\n" +
+                    "   • Click on a path tile at the map edge\n" +
+                    "   • Or place a Start Point tile from the palette");
                 return false;
             }
         }
 
         if (!hasEnd) {
-            showAlert("Validation Error", "No End Point (Castle) found on the map.");
+            showAlert("Map Validation Error", 
+                "No End Point (Castle) found!\n\n" +
+                "❌ Your map is missing a Castle where enemies go to win\n" +
+                "✅ Solution: Add a 2x2 Castle structure to your map\n\n" +
+                "💡 How to fix:\n" +
+                "   • Select 'Castle' from the Special Points section\n" +
+                "   • Click to place a 2x2 Castle structure\n" +
+                "   • Ensure it's placed on grass tiles");
             return false;
         }
 
         if (startPoint == null) {
-            showAlert("Validation Error", "Start point is null despite being detected. Please re-set start point.");
+            showAlert("Map Validation Error", 
+                "Start Point error!\n\n" +
+                "❌ Start point detected but location is invalid\n" +
+                "✅ Solution: Re-place your Start Point using the 'Set Start' button\n\n" +
+                "💡 Tip: This is usually a temporary issue - try setting the start point again.");
             return false;
         }
         if (endPointAdjacent == null) {
-            showAlert("Validation Error",
-                    "End point (adjacent walkable) is null. Please ensure castle has valid path connection.");
+            showAlert("Map Validation Error", 
+                "Castle accessibility error!\n\n" +
+                "❌ Castle is present but cannot be reached by enemies\n" +
+                "✅ Solution: Place path tiles adjacent to your Castle\n\n" +
+                "💡 Tip: Enemies need to walk to the Castle - ensure there's a path connection.");
             return false;
         }
 
         if (!isPathConnected(startPoint, endPointAdjacent)) {
-            showAlert("Validation Error", "No valid path found from Start Point to End Point.");
+            showAlert("Map Validation Error", 
+                "Path not connected!\n\n" +
+                "❌ No valid route found from Start Point to Castle\n" +
+                "✅ Solution: Create a continuous path using path tiles\n\n" +
+                "💡 How to fix:\n" +
+                "   • Use path tiles to connect Start Point to Castle\n" +
+                "   • Check for gaps in your path\n" +
+                "   • Ensure path tiles are properly oriented\n" +
+                "   • Use corners and turns to navigate around obstacles");
             return false;
         }
 
-        showAlert("Validation Success", "Map is valid!");
+        // Count TOWER_SLOT tiles
+        int towerSlotCount = 0;
+        for (int y = 0; y < currentMap.getHeight(); y++) {
+            for (int x = 0; x < currentMap.getWidth(); x++) {
+                if (currentMap.getTileType(x, y) == TileType.TOWER_SLOT) {
+                    towerSlotCount++;
+                }
+            }
+        }
+        if (towerSlotCount < 4) {
+            showAlert("Map Validation Error", 
+                "Not enough Tower Slots!\n\n" +
+                "❌ Found only " + towerSlotCount + " Tower Slots (minimum required: 4)\n" +
+                "✅ Solution: Add more Tower Slot tiles to your map\n\n" +
+                "💡 How to fix:\n" +
+                "   • Select 'Tower Slot' from the Towers section\n" +
+                "   • Place at least " + (4 - towerSlotCount) + " more Tower Slots\n" +
+                "   • These allow players to build towers during gameplay\n" +
+                "   • Place them strategically along the enemy path");
+            return false;
+        }
+
+        showAlert("Map Validation Success", 
+            "🎉 Map is valid and ready to play!\n\n" +
+            "✅ Start Point: Properly placed at map edge\n" +
+            "✅ End Point: Castle structure complete and accessible\n" +
+            "✅ Path: Continuous route from start to end\n" +
+            "✅ Tower Slots: Found " + towerSlotCount + " slots for player towers\n\n" +
+            "💾 Your map is ready to save and enjoy!");
         return true;
     }
 
@@ -326,11 +397,17 @@ public class MapEditorScreen extends BorderPane {
     }
 
     private Point findAdjacentWalkable(int baseX, int baseY) {
+        // Castle structure: END_POINT is at (baseX, baseY), right side is at (baseX+1, baseY)
+        // We need to check for walkable tiles adjacent to the castle RIGHT SIDE
+        int castleRightX = baseX + 1;
+        int castleRightY = baseY;
+        
+        // Check tiles adjacent to the castle right side (2,1 position)
         Point[] potentialEntries = {
-                new Point(baseX - 1, baseY), new Point(baseX - 1, baseY + 1),
-                new Point(baseX + 2, baseY), new Point(baseX + 2, baseY + 1),
-                new Point(baseX, baseY - 1), new Point(baseX + 1, baseY - 1),
-                new Point(baseX, baseY + 2), new Point(baseX + 1, baseY + 2)
+                new Point(castleRightX - 1, castleRightY),     // Left of right side (back to center)
+                new Point(castleRightX + 1, castleRightY),     // Right of right side (outside castle)
+                new Point(castleRightX, castleRightY - 1),     // Above right side
+                new Point(castleRightX, castleRightY + 1)      // Below right side
         };
 
         for (Point p : potentialEntries) {
@@ -584,39 +661,66 @@ public class MapEditorScreen extends BorderPane {
     }
 
     private void showAlert(String title, String content) {
-        Alert.AlertType type = Alert.AlertType.INFORMATION;
-        if (title.toLowerCase().contains("error") || title.toLowerCase().contains("failed")) {
-            type = Alert.AlertType.ERROR;
-        } else if (title.toLowerCase().contains("success") || title.toLowerCase().contains("saved")
-                || title.toLowerCase().contains("deleted")) {
-            type = Alert.AlertType.INFORMATION;
-        } else if (title.toLowerCase().contains("confirm")) {
-            // Confirmation dialogs are usually created directly, not via this generic
-            // showAlert
-            // But if they were, AlertType.CONFIRMATION would be used.
-            type = Alert.AlertType.CONFIRMATION;
+        try {
+            Alert.AlertType type = Alert.AlertType.INFORMATION;
+            if (title.toLowerCase().contains("error") || title.toLowerCase().contains("failed")) {
+                type = Alert.AlertType.ERROR;
+            } else if (title.toLowerCase().contains("success") || title.toLowerCase().contains("saved")
+                    || title.toLowerCase().contains("deleted")) {
+                type = Alert.AlertType.INFORMATION;
+            } else if (title.toLowerCase().contains("confirm")) {
+                type = Alert.AlertType.CONFIRMATION;
+            }
+
+            Alert alert = new Alert(type);
+            alert.setTitle(title);
+            alert.setHeaderText(null);
+            alert.setContentText(content);
+
+            // Apply base dialog styling first
+            applyDialogStyling(alert.getDialogPane());
+
+            // Then add type-specific styling
+            if (alert.getAlertType() == Alert.AlertType.ERROR) {
+                alert.getDialogPane().getStyleClass().add("error-dialog");
+            } else if (alert.getAlertType() == Alert.AlertType.CONFIRMATION) {
+                alert.getDialogPane().getStyleClass().add("confirmation-dialog");
+            } else if (alert.getAlertType() == Alert.AlertType.INFORMATION) {
+                alert.getDialogPane().getStyleClass().add("info-dialog");
+            }
+
+            // CRITICAL: Ensure dialog shows on top WITHOUT exiting fullscreen
+            alert.initOwner(primaryStage);
+            alert.initModality(Modality.APPLICATION_MODAL);
+            
+            // Prevent fullscreen exit by keeping dialog centered and properly sized
+            alert.setResizable(false);
+            alert.getDialogPane().setPrefWidth(400);
+            alert.getDialogPane().setMinWidth(400);
+            alert.getDialogPane().setPrefHeight(200);
+            
+            // Show in center of parent window, not system desktop
+            alert.showAndWait();
+            
+        } catch (Exception e) {
+            // Fallback if alert fails - log to console instead of crashing
+            System.err.println("Alert Error - " + title + ": " + content);
+            System.err.println("Exception showing alert: " + e.getMessage());
+            e.printStackTrace();
+            
+            // Try a minimal system dialog as last resort
+            try {
+                Alert fallbackAlert = new Alert(Alert.AlertType.ERROR);
+                fallbackAlert.setTitle("Map Editor Alert");
+                fallbackAlert.setContentText(title + ": " + content);
+                fallbackAlert.initOwner(primaryStage);
+                fallbackAlert.setResizable(false);
+                fallbackAlert.showAndWait();
+            } catch (Exception ex) {
+                // If even that fails, just log it
+                System.err.println("Complete dialog failure: " + ex.getMessage());
+            }
         }
-
-        Alert alert = new Alert(type);
-        alert.setTitle(title);
-        alert.setHeaderText(null);
-        alert.setContentText(content);
-
-        // Apply base dialog styling first
-        applyDialogStyling(alert.getDialogPane());
-
-        // Then add type-specific styling
-        if (alert.getAlertType() == Alert.AlertType.ERROR) {
-            alert.getDialogPane().getStyleClass().add("error-dialog");
-        } else if (alert.getAlertType() == Alert.AlertType.CONFIRMATION) {
-            // This case might be less used if confirmations are built directly
-            alert.getDialogPane().getStyleClass().add("confirmation-dialog");
-        } else if (alert.getAlertType() == Alert.AlertType.INFORMATION) {
-            // Optionally add a specific class for information dialogs if needed
-            // alert.getDialogPane().getStyleClass().add("info-dialog");
-        }
-
-        alert.showAndWait();
     }
 
     private void saveMap() {
@@ -720,7 +824,11 @@ public class MapEditorScreen extends BorderPane {
 
     private void goBack() {
         MainMenuScreen mainMenu = new MainMenuScreen(primaryStage);
-        Scene mainMenuScene = new Scene(mainMenu, primaryStage.getWidth(), primaryStage.getHeight());
+        
+        // Use screen dimensions to match fullscreen size
+        double w = javafx.stage.Screen.getPrimary().getBounds().getWidth();
+        double h = javafx.stage.Screen.getPrimary().getBounds().getHeight();
+        Scene mainMenuScene = new Scene(mainMenu, w, h);
         mainMenuScene.getStylesheets().add(getClass().getResource("/css/style.css").toExternalForm());
 
         ImageCursor customCursor = UIAssets.getCustomCursor();
@@ -728,8 +836,23 @@ public class MapEditorScreen extends BorderPane {
             mainMenuScene.setCursor(customCursor);
         }
 
-        primaryStage.setScene(mainMenuScene);
-        primaryStage.setFullScreen(true);
+        // IMPROVED FIX: Use Platform.runLater for smooth transition and cursor enforcement
+        javafx.application.Platform.runLater(() -> {
+            String originalHint = primaryStage.getFullScreenExitHint();
+            primaryStage.setFullScreenExitHint("");
+            
+            primaryStage.setFullScreen(false);
+            primaryStage.setScene(mainMenuScene);
+            
+            // Enforce custom cursor on the new scene
+            UIAssets.enforceCustomCursor(mainMenuScene);
+            UIAssets.startCursorEnforcement(mainMenuScene);
+            
+            javafx.application.Platform.runLater(() -> {
+                primaryStage.setFullScreen(true);
+                primaryStage.setFullScreenExitHint(originalHint);
+            });
+        });
     }
 
     private void resizeMap(int newWidth, int newHeight) {

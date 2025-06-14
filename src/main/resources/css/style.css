@@ -526,6 +526,45 @@
     -fx-scale-y: 1.05;
 }
 
+/* Wizard Button specific styling - woody background blend */
+.wizard-button {
+    -fx-background-color: #8B4513;
+    -fx-background-image: url("/Asset_pack/Background/wood.jpg");
+    -fx-background-repeat: repeat;
+    -fx-background-position: center;
+    -fx-background-size: cover;
+    -fx-padding: 2px;
+    -fx-border-color: #654321;
+    -fx-border-width: 1px;
+    -fx-background-insets: 0;
+    -fx-background-radius: 8px;
+    -fx-border-radius: 8px;
+    -fx-cursor: hand;
+    -fx-effect: innershadow(gaussian, rgba(0,0,0,0.3), 3, 0, 1, 1);
+}
+
+.wizard-button:hover {
+    -fx-background-color: #A0522D; /* Slightly lighter brown on hover */
+    -fx-border-color: #8B4513;
+    -fx-effect: innershadow(gaussian, rgba(0,0,0,0.4), 4, 0, 1, 2);
+}
+
+.wizard-button:pressed {
+    -fx-background-color: #654321; /* Darker brown when pressed */
+    -fx-border-color: #4A4A4A;
+    -fx-effect: innershadow(gaussian, rgba(0,0,0,0.6), 5, 0, 2, 2);
+}
+
+.wizard-button:focused,
+.wizard-button:armed {
+    -fx-background-color: #8B4513;
+    -fx-border-color: #654321;
+}
+
+.wizard-button ImageView {
+    -fx-smooth: true;
+}
+
 /* Style for the Start Game button in MapSelectionScreen */
 .start-game-button {
     -fx-background-image: url("/Asset_pack/UI/Button_Blue_3Slides.png");
@@ -846,8 +885,46 @@
 
 /* Make TextInputDialog fields consistent */
 .dialog-pane .text-input {
-    -fx-background-color: #404040;
-    -fx-text-fill: #E0E0E0;
-    -fx-border-color: #5A5A5A;
-    -fx-prompt-text-fill: #909090;
+    -fx-background-color: #4A4A4A;
+    -fx-text-fill: white;
+    -fx-border-color: #666666;
+    -fx-border-width: 1px;
+    -fx-border-radius: 3px;
+}
+
+/* Medieval wood-colored scrollbar styling for music section */
+.scroll-pane .scroll-bar:vertical {
+    -fx-background-color: linear-gradient(to right, #8B4513, #A0522D);
+    -fx-background-radius: 8px;
+    -fx-border-color: #654321;
+    -fx-border-width: 1px;
+    -fx-border-radius: 8px;
+}
+
+.scroll-pane .scroll-bar:vertical .thumb {
+    -fx-background-color: linear-gradient(to right, #D2691E, #CD853F);
+    -fx-background-radius: 6px;
+    -fx-border-color: #8B4513;
+    -fx-border-width: 1px;
+    -fx-border-radius: 6px;
+}
+
+.scroll-pane .scroll-bar:vertical .track {
+    -fx-background-color: linear-gradient(to right, #654321, #8B4513);
+    -fx-background-radius: 8px;
+}
+
+.scroll-pane .scroll-bar:vertical .increment-button,
+.scroll-pane .scroll-bar:vertical .decrement-button {
+    -fx-background-color: linear-gradient(to right, #8B4513, #A0522D);
+    -fx-background-radius: 6px;
+    -fx-border-color: #654321;
+    -fx-border-width: 1px;
+    -fx-border-radius: 6px;
+}
+
+.scroll-pane .scroll-bar:vertical .increment-arrow,
+.scroll-pane .scroll-bar:vertical .decrement-arrow {
+    -fx-background-color: #F5DEB3;
+    -fx-shape: "M 0 0 h 7 l -3.5 4 z";
 }

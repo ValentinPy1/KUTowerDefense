@@ -57,6 +57,7 @@ public class UIAssets {
             loadImage("Ribbon_Red", basePath + "Ribbon_Red_3Slides.png");
             loadImage("Ribbon_Yellow", basePath + "Ribbon_Yellow_3Slides.png");
             loadImage("KUTowerButtons", basePath + "kutowerbuttons4.png");
+            loadImage("WizardButton", basePath + "wiz.png");
             loadImage("01", basePath + "01.png");
 
             // Effect sprite sheets
@@ -390,5 +391,167 @@ public class UIAssets {
         }
 
         return button;
+    }
+    
+    /**
+     * Creates a button with a standalone image (not from sprite sheet).
+     *
+     * @param tooltipText     Text for the button's tooltip.
+     * @param imageName       Name of the image in the cache (e.g., "WizardButton").
+     * @param iconDisplaySize The desired display size (width and height) for the icon on the button.
+     * @return A new Button configured with the specified image and tooltip.
+     */
+    public static Button createStandaloneIconButton(String tooltipText, String imageName, double iconDisplaySize) {
+        Button button = new Button();
+        Image buttonImage = getImage(imageName);
+
+        if (buttonImage != null) {
+            ImageView iconView = new ImageView(buttonImage);
+            iconView.setFitWidth(iconDisplaySize);
+            iconView.setFitHeight(iconDisplaySize);
+            iconView.setPreserveRatio(true);
+            iconView.setSmooth(true);
+
+            button.setGraphic(iconView);
+            button.getStyleClass().add("icon-button"); // For CSS styling - this handles transparent background
+            
+            // Remove the inline styling - let CSS handle it
+            // The .icon-button CSS class already sets:
+            // -fx-background-color: transparent;
+            // -fx-padding: 0px;
+            // -fx-border-color: transparent;
+            // -fx-border-width: 0;
+            // -fx-background-insets: 0;
+            // -fx-background-radius: 0;
+            
+            // Revert to custom cursor on exit if it was changed by something else
+            button.setOnMouseExited(e -> {
+                if (button.getScene() != null && button.getScene().getCursor() != UIAssets.getCustomCursor()) {
+                    button.getScene().setCursor(UIAssets.getCustomCursor());
+                }
+            });
+
+        } else {
+            // Fallback if the image isn't loaded
+            button.setText("?"); // Placeholder for missing icon
+            System.err.println("Standalone image '" + imageName + "' not found for icon button.");
+        }
+
+        if (tooltipText != null && !tooltipText.isEmpty()) {
+            button.setTooltip(new javafx.scene.control.Tooltip(tooltipText));
+        }
+
+        return button;
+    }
+
+    /**
+     * Enforces the custom cursor on a scene and all its children.
+     * This prevents UI elements from overriding the custom cursor.
+     * 
+     * @param scene the scene to enforce cursor on
+     */
+    public static void enforceCustomCursor(javafx.scene.Scene scene) {
+        ImageCursor customCursor = getCustomCursor();
+        if (customCursor != null && scene != null) {
+            // Set cursor on scene
+            scene.setCursor(customCursor);
+            
+            // Force cursor on root and all children
+            if (scene.getRoot() != null) {
+                enforceCustomCursorOnNode(scene.getRoot());
+            }
+            
+            // Add listeners to maintain cursor when scene focus changes
+            scene.focusOwnerProperty().addListener((obs, oldNode, newNode) -> {
+                javafx.application.Platform.runLater(() -> {
+                    if (scene.getCursor() != customCursor) {
+                        scene.setCursor(customCursor);
+                    }
+                });
+            });
+        }
+    }
+
+    /**
+     * Recursively enforces custom cursor on a node and all its children.
+     */
+    private static void enforceCustomCursorOnNode(javafx.scene.Node node) {
+        ImageCursor customCursor = getCustomCursor();
+        if (customCursor == null) return;
+        
+        // Set cursor on this node
+        node.setCursor(customCursor);
+        
+        // Special handling for different node types
+        if (node instanceof javafx.scene.control.Button) {
+            Button button = (Button) node;
+            
+            // Override button hover behavior to maintain custom cursor
+            button.setOnMouseEntered(e -> {
+                button.setCursor(customCursor);
+                e.consume();
+            });
+            
+            button.setOnMouseExited(e -> {
+                button.setCursor(customCursor);
+                e.consume();
+            });
+            
+            // Maintain cursor during press
+            button.setOnMousePressed(e -> {
+                button.setCursor(customCursor);
+            });
+            
+            button.setOnMouseReleased(e -> {
+                button.setCursor(customCursor);
+            });
+        }
+        
+        // Handle Canvas separately to maintain custom cursor during interactions
+        if (node instanceof javafx.scene.canvas.Canvas) {
+            javafx.scene.canvas.Canvas canvas = (javafx.scene.canvas.Canvas) node;
+            canvas.setCursor(customCursor);
+            
+            // Ensure cursor stays custom during all mouse events
+            canvas.setOnMouseEntered(e -> canvas.setCursor(customCursor));
+            canvas.setOnMouseMoved(e -> {
+                if (canvas.getCursor() != customCursor) {
+                    canvas.setCursor(customCursor);
+                }
+            });
+        }
+        
+        // Recursively apply to children if it's a parent node
+        if (node instanceof javafx.scene.Parent) {
+            javafx.scene.Parent parent = (javafx.scene.Parent) node;
+            for (javafx.scene.Node child : parent.getChildrenUnmodifiable()) {
+                enforceCustomCursorOnNode(child);
+            }
+        }
+    }
+
+    /**
+     * Sets up periodic cursor enforcement to catch any cursor overrides.
+     * Call this once per scene to maintain custom cursor.
+     */
+    public static void startCursorEnforcement(javafx.scene.Scene scene) {
+        ImageCursor customCursor = getCustomCursor();
+        if (customCursor == null || scene == null) return;
+        
+        // Create a timeline that periodically checks and restores the custom cursor
+        javafx.animation.Timeline cursorEnforcer = new javafx.animation.Timeline(
+            new javafx.animation.KeyFrame(javafx.util.Duration.millis(100), e -> {
+                if (scene.getCursor() != customCursor) {
+                    scene.setCursor(customCursor);
+                }
+                
+                // Also check focused node
+                if (scene.getFocusOwner() != null && scene.getFocusOwner().getCursor() != customCursor) {
+                    scene.getFocusOwner().setCursor(customCursor);
+                }
+            })
+        );
+        cursorEnforcer.setCycleCount(javafx.animation.Animation.INDEFINITE);
+        cursorEnforcer.play();
     }
 }
